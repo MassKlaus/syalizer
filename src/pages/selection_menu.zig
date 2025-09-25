@@ -64,8 +64,6 @@ pub fn RenderSelectionMenuPage(plug_state: *PlugState) void {
         const button_rectangle = rl.Rectangle.init(@floatFromInt(base_x), @floatFromInt(position_y), @floatFromInt(max_width), button_height);
 
         if (rg.button(button_rectangle, text)) {
-            plug_state.logInfo("Song \"{s}\" Selected.", .{song.path});
-
             plug_state.navigateTo(.Visualizer);
 
             const music = rl.loadMusicStream(song.path) catch @panic("Failed to load the music file.");
@@ -78,6 +76,8 @@ pub fn RenderSelectionMenuPage(plug_state: *PlugState) void {
 
             rl.attachAudioStreamProcessor(music.stream, plug.collectAudioSamples);
             rl.playMusicStream(music);
+
+            
 
             std.debug.print("Music Frames: {}", .{music.frameCount});
         } else if (rl.checkCollisionPointRec(mouse_position, button_rectangle) and (plug_state.preview_song == null or song != plug_state.preview_song.?)) {

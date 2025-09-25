@@ -86,6 +86,7 @@ pub const PlugState = struct {
         border_color: rl.Color,
         fps: i32,
         background: ?[]u8,
+        beat: bool,
 
         pub fn init() UserSettings {
             return .{
@@ -96,6 +97,7 @@ pub const PlugState = struct {
                 .pressed_color = rl.Color.dark_green,
                 .fps = 60,
                 .background = null,
+                .beat = false,
             };
         }
     };
@@ -169,7 +171,6 @@ pub const PlugState = struct {
     display_shader_UI: bool = false,
 
     log_file: std.fs.File,
-    log_writer: std.fs.File.Writer,
 
     //Page stack
     pages: std.ArrayListUnmanaged(Pages),
@@ -215,7 +216,6 @@ pub const PlugState = struct {
             .pages = std.ArrayListUnmanaged(Pages){},
             .settings = UserSettings.init(),
             .log_file = file,
-            .log_writer = file.writer(),
             .applied_shaders = std.ArrayListUnmanaged(*ShaderInfo){},
         };
 
@@ -251,9 +251,7 @@ pub const PlugState = struct {
 
     pub fn loadShaders(self: *PlugState) !void {
         var shaders_dir = std.fs.cwd().openDir("./shaders", .{ .iterate = true }) catch blk: {
-            self.logInfo("Failed to open shader folder, trying to create it.", .{});
             std.fs.cwd().makeDir("./shaders") catch |err| {
-                self.logError("Failed to create shader folder. Quitting", .{});
                 return err;
             };
 
@@ -264,14 +262,10 @@ pub const PlugState = struct {
 
         defer shaders_dir.close();
 
-        self.log("Shaders Folder Opened", .{}, false);
-
         var walker = shaders_dir.walk(self.allocator) catch |err| {
-            self.logError("Failed to initalize shader walker.", .{});
             return err;
         };
         defer walker.deinit();
-        self.log("Shaders Walker Created", .{}, false);
 
         var shadersList = std.ArrayListUnmanaged(ShaderInfo){};
         errdefer shadersList.deinit(self.allocator);
@@ -279,7 +273,6 @@ pub const PlugState = struct {
         while (walker.next()) |Optionalentry| {
             if (Optionalentry) |entry| {
                 if (!std.ascii.endsWithIgnoreCase(entry.basename, ".fs")) continue;
-                self.logInfo("Handling Entry \"{s}\"", .{entry.basename});
 
                 const path: []const u8 = try shaders_dir.realpath(entry.path, &text_buffer);
                 const valid_path = try utils.adaptStringAlloc(self.allocator, path);
@@ -294,12 +287,10 @@ pub const PlugState = struct {
                 try shadersList.append(self.allocator, shader);
             } else break;
         } else |err| {
-            self.logError("Walker Errored. {}", .{err});
             return err;
         }
 
         self.shaders = try shadersList.toOwnedSlice(self.allocator);
-        self.logInfo("{} Shaders Loaded", .{self.shaders.len});
     }
 
     pub fn unloadShaders(self: *PlugState) void {
@@ -314,9 +305,7 @@ pub const PlugState = struct {
     const validSongExtensions = [_][]const u8{ ".mp3", ".flac", ".wav", ".ogg", ".qoa", ".xm", ".mod" };
     pub fn loadSongList(self: *PlugState) !void {
         var songs_dir = std.fs.cwd().openDir("./music", .{ .iterate = true }) catch blk: {
-            self.logInfo("Failed to open music folder, trying to create it.", .{});
             std.fs.cwd().makeDir("./music") catch |err| {
-                self.logError("Failed to create music folder. Quitting", .{});
                 return err;
             };
 
@@ -326,15 +315,10 @@ pub const PlugState = struct {
         };
         defer songs_dir.close();
 
-        self.log("Music Folder Opened", .{}, false);
-
         var walker = songs_dir.walk(self.allocator) catch |err| {
-            self.logError("Failed to initalize song walker.", .{});
             return err;
         };
         defer walker.deinit();
-
-        self.log("Music Walker Created", .{}, false);
 
         var songList = std.ArrayListUnmanaged(SongInfo){};
         errdefer songList.deinit(self.allocator);
@@ -347,7 +331,6 @@ pub const PlugState = struct {
 
                 if (!valid_extension) continue;
 
-                self.log("Handling Entry \"{s}\"", .{entry.basename}, false);
                 const path: []const u8 = try songs_dir.realpath(entry.path, &text_buffer);
                 const valid_path = try utils.adaptStringAlloc(self.allocator, path);
                 const name = try utils.adaptStringAlloc(self.allocator, entry.basename);
@@ -358,12 +341,10 @@ pub const PlugState = struct {
 
             break;
         } else |err| {
-            self.logError("Walker Errored. {}", .{err});
             return err;
         }
 
         self.songs = try songList.toOwnedSlice(self.allocator);
-        self.logInfo("{} Songs Loaded", .{self.songs.len});
     }
 
     pub fn unloadSongList(self: *PlugState) void {
@@ -482,39 +463,19 @@ pub const PlugState = struct {
 
     pub fn saveConfig(plug_state: *PlugState) !void {
         var file = try std.fs.cwd().createFile(".config", .{});
-        const writer = file.writer();
+        var writer = file.writer(&.{});
         const typeInfo = @typeInfo(UserSettings);
         const structInfo = typeInfo.@"struct";
         inline for (structInfo.fields) |field| {
             if (comptime std.mem.eql(u8, field.name, "fps")) {
-                try writer.print("fps={}\n", .{plug_state.settings.fps});
+                try writer.interface.print("fps={}\n", .{plug_state.settings.fps});
             } else if (field.type == rl.Color) {
                 const value = @field(plug_state.settings, field.name);
-                try writer.print("{s}={} {} {}\n", .{ field.name, value.r, value.g, value.b });
+                try writer.interface.print("{s}={} {} {}\n", .{ field.name, value.r, value.g, value.b });
             } else if (comptime std.mem.eql(u8, field.name, "background")) {
-                try writer.print("background={s}\n", .{plug_state.settings.background orelse ""});
+                try writer.interface.print("background={s}\n", .{plug_state.settings.background orelse ""});
             }
         }
-    }
-
-    pub fn log(plug_state: *PlugState, comptime format: []const u8, args: anytype, print_location: bool) void {
-        if (print_location) {
-            const info = std.debug.getSelfDebugInfo() catch @panic("Invalid debug info");
-            const addr = @returnAddress();
-            const tty: std.io.tty.Config = .no_color;
-            std.debug.printSourceAtAddress(info, plug_state.log_writer, addr, tty) catch @panic("Failed to print log location");
-        }
-
-        plug_state.log_writer.print(format, args) catch @panic("Failed to print");
-        plug_state.log_writer.print("\n", .{}) catch @panic("Failed to print");
-    }
-
-    pub inline fn logInfo(plug_state: *PlugState, comptime format: []const u8, args: anytype) void {
-        log(plug_state, format, args, false);
-    }
-
-    pub inline fn logError(plug_state: *PlugState, comptime format: []const u8, args: anytype) void {
-        log(plug_state, format, args, true);
     }
 };
 
@@ -523,7 +484,7 @@ inline fn complexAmpToNormalAmp(complex_amplitude: Complex(f32)) f32 {
 }
 
 // a frame is L+R | f32 takes both sides
-pub fn collectAudioSamples(buffer: ?*anyopaque, frames: c_uint) callconv(.C) void {
+pub fn collectAudioSamples(buffer: ?*anyopaque, frames: c_uint) callconv(.c) void {
     const frame_buffer: ?[*]const f32 = @ptrCast(@alignCast(buffer.?));
 
     if (frame_buffer == null or global_plug_state.music == null) {
@@ -640,9 +601,7 @@ pub fn plugClose(plug_state: *PlugState) void {
 pub fn plugInit(plug_state: *PlugState) void {
     global_plug_state = plug_state;
     plug_state.settings = plug_state.loadConfig() catch blk: {
-        plug_state.saveConfig() catch {
-            plug_state.logError("Failed to setup Config.", .{});
-        };
+        plug_state.saveConfig() catch {};
         break :blk PlugState.UserSettings.init();
     };
 
@@ -654,32 +613,22 @@ pub fn plugInit(plug_state: *PlugState) void {
     setupGuiStyle(plug_state);
     rl.setExitKey(.null);
 
-    plug_state.loadSongList() catch |err| {
-        plug_state.log("Failed to load Song List.", .{}, true);
-        plug_state.logInfo("Error: {}", .{err});
+    plug_state.loadSongList() catch {
         @panic("Error: Failed to load Song list.");
     };
 
-    plug_state.loadShaders() catch |err| {
-        plug_state.log("Failed to load Shader List.", .{}, true);
-        plug_state.logInfo("Error: {}", .{err});
+    plug_state.loadShaders() catch {
         @panic("Error: Failed to load Shader list.");
     };
 
     if (plug_state.settings.background) |bg| bgscope: {
-        const background = rl.loadImage(utils.adaptString(bg)) catch |err| {
-            plug_state.log("Failed to load background.", .{}, true);
-            plug_state.logInfo("Error: {}", .{err});
+        const background = rl.loadImage(utils.adaptString(bg)) catch {
             break :bgscope;
         };
 
-        plug_state.background_texture = rl.loadTextureFromImage(background) catch |err| {
-            plug_state.log("Failed to load background.", .{}, true);
-            plug_state.logInfo("Error: {}", .{err});
+        plug_state.background_texture = rl.loadTextureFromImage(background) catch {
             break :bgscope;
         };
-
-        plug_state.logInfo("Loaded background successfully.", .{});
     }
 }
 

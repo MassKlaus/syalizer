@@ -32,14 +32,13 @@ pub fn main() anyerror!void {
     rl.initAudioDevice();
     defer rl.closeAudioDevice();
 
-    state = PlugState.init(allocator, 16) catch @panic("State failed to initialize.");
+    state = PlugState.init(allocator, 13) catch @panic("State failed to initialize.");
     const state_ptr: *PlugState = &state;
 
     plug.plugInit(state_ptr);
     defer plug.plugClose(state_ptr);
 
     // Main game loop
-    state_ptr.log("Loop start", .{}, false);
     while (!(rl.windowShouldClose() or state_ptr.close)) { // Detect window close button or ESC key
 
         //----------------------------------------------------------------------------------

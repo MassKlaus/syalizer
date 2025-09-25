@@ -20,9 +20,8 @@ fn handleVisualizerInput(plug_state: *PlugState) void {
         } else {
             plug_state.clearFFT();
             if (plug_state.music) |music| {
-                rl.stopMusicStream(music);
+                rl.pauseMusicStream(music);
                 rl.detachAudioStreamProcessor(music.stream, plug.collectAudioSamples);
-                rl.unloadMusicStream(music);
                 plug_state.music = null;
             }
             plug_state.goBack();
@@ -354,20 +353,22 @@ fn RenderVisualizerFrameToTexture(plug_state: *PlugState, output_texture: *rl.Re
             rl.drawLineStrip(&top_points, plug_state.settings.front_color);
         }
 
-        if (beat_cooldown > 0) {
-            beat_cooldown -= delta_time;
-            rl.drawCircle(0, 0, 200, plug_state.settings.front_color);
-            rl.drawCircle(output_texture.texture.width, 0, 200, plug_state.settings.front_color);
-            rl.drawCircle(output_texture.texture.width, output_texture.texture.height, 200, plug_state.settings.front_color);
-            rl.drawCircle(0, output_texture.texture.height, 200, plug_state.settings.front_color);
-        } else for (plug_state.subbands[0..5]) |subband| {
-            if (subband.history.contains_beat) {
-                beat_cooldown = 0.2;
+        if (plug_state.settings.beat) {
+            if (beat_cooldown > 0) {
+                beat_cooldown -= delta_time;
                 rl.drawCircle(0, 0, 200, plug_state.settings.front_color);
                 rl.drawCircle(output_texture.texture.width, 0, 200, plug_state.settings.front_color);
                 rl.drawCircle(output_texture.texture.width, output_texture.texture.height, 200, plug_state.settings.front_color);
                 rl.drawCircle(0, output_texture.texture.height, 200, plug_state.settings.front_color);
-                break;
+            } else for (plug_state.subbands[0..5]) |subband| {
+                if (subband.history.contains_beat) {
+                    beat_cooldown = 0.2;
+                    rl.drawCircle(0, 0, 200, plug_state.settings.front_color);
+                    rl.drawCircle(output_texture.texture.width, 0, 200, plug_state.settings.front_color);
+                    rl.drawCircle(output_texture.texture.width, output_texture.texture.height, 200, plug_state.settings.front_color);
+                    rl.drawCircle(0, output_texture.texture.height, 200, plug_state.settings.front_color);
+                    break;
+                }
             }
         }
     }
@@ -376,7 +377,7 @@ fn RenderVisualizerFrameToTexture(plug_state: *PlugState, output_texture: *rl.Re
 var fpsBuffer: [100]u8 = [1]u8{0} ** 100;
 
 fn RenderVisualizeVideoWithFFMPEG(plug_state: *PlugState) void {
-    const fpsToText = std.fmt.bufPrintIntToSlice(&fpsBuffer, plug_state.settings.fps, 10, .lower, .{});
+    const fpsToText = std.fmt.bufPrint(&fpsBuffer, "{}", .{plug_state.settings.fps}) catch @panic("Should never happen.");
     const argv = [_][]const u8{ "ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", "1920x1080", "-r", fpsToText, "-i", "-", "-i", plug_state.song.?.path, "-vf", "vflip", "-c:v", "libx264", "-b:v", "25000k", "-c:a", "aac", "-b:a", "200k", "output.mp4" };
     var proc = std.process.Child.init(&argv, plug_state.allocator);
     proc.stdin_behavior = .Pipe;
