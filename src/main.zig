@@ -23,8 +23,8 @@ pub fn main() anyerror!void {
 
     // Initialization
     //--------------------------------------------------------------------------------------
-    const screenWidth = 1920;
-    const screenHeight = 1080;
+    const screenWidth = 1280;
+    const screenHeight = 720;
 
     //-------------------------------------------------------------------------------------
     rl.initWindow(screenWidth, screenHeight, "Syaliser");

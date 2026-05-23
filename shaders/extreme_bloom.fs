@@ -6,7 +6,7 @@ out vec4 fragColor;
 
 void main() {
     // Hardcoded resolution (e.g., 800x450) and intensity
-    vec2 resolution = vec2(1920, 1080);
+    vec2 resolution = vec2(1280, 720);
     float intensity = 25.1;
 
     vec2 texel = 1.0 / resolution;

@@ -6,7 +6,7 @@ uniform sampler2D texture0;            // The input texture
 
 void main()
 {
-    vec2 resolution = vec2(1920, 1080);
+    vec2 resolution = vec2(1280, 720);
     float intensity = 1.1;
 
     vec2 texel = 1.0 / resolution;

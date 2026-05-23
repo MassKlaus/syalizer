@@ -209,10 +209,10 @@ pub const PlugState = struct {
             .subbands = subbands,
             .shaders = undefined,
             .songs = undefined,
-            .ping_texture = rl.loadRenderTexture(1920, 1080) catch @panic("Failed to create the render Texture"),
-            .pong_texture = rl.loadRenderTexture(1920, 1080) catch @panic("Failed to create the render Texture"),
-            .render_texture = rl.loadRenderTexture(1920, 1080) catch @panic("Failed to create the render Texture"),
-            .shader_texture = rl.loadRenderTexture(1920, 1080) catch @panic("Failed to create the shader Texture"),
+            .ping_texture = rl.loadRenderTexture(1280, 720) catch @panic("Failed to create the render Texture"),
+            .pong_texture = rl.loadRenderTexture(1280, 720) catch @panic("Failed to create the render Texture"),
+            .render_texture = rl.loadRenderTexture(1280, 720) catch @panic("Failed to create the render Texture"),
+            .shader_texture = rl.loadRenderTexture(1280, 720) catch @panic("Failed to create the shader Texture"),
             .pages = std.ArrayListUnmanaged(Pages){},
             .settings = UserSettings.init(),
             .log_file = file,
@@ -500,7 +500,7 @@ pub fn collectAudioSamples(buffer: ?*anyopaque, frames: c_uint) callconv(.c) voi
 }
 
 pub fn collectAudioSamplesZig(samples: []const f32, channels: usize) void {
-    const sized_samples = if (samples.len / 2 > global_plug_state.temp_buffer.len) samples[0 .. global_plug_state.temp_buffer.len * 2] else samples;
+    const sized_samples = if (samples.len > global_plug_state.temp_buffer.len * 2) samples[0 .. global_plug_state.temp_buffer.len * 2] else samples;
     for (sized_samples, 0..) |sample, i| {
         if (i % channels == 0) {
             global_plug_state.temp_buffer[i / channels] = sample;
@@ -579,11 +579,9 @@ pub fn analyzeAudioSignal(plug_state: *PlugState, delta_time: f32) usize {
     for (0..size) |i| {
         const smoothness: f32 = 8;
         plug_state.smooth_amplitudes[i] += (plug_state.log_amplitudes[i] - plug_state.smooth_amplitudes[i]) * smoothness * delta_time;
-        if (plug_state.max_smooth_amplitude < plug_state.smooth_amplitudes[i]) plug_state.max_smooth_amplitude = plug_state.smooth_amplitudes[i];
 
         const smearness: f32 = 3;
         plug_state.smear_amplitudes[i] += (plug_state.smooth_amplitudes[i] - plug_state.smear_amplitudes[i]) * smearness * delta_time;
-        if (plug_state.max_smear_amplitude < plug_state.smear_amplitudes[i]) plug_state.max_smear_amplitude = plug_state.smear_amplitudes[i];
     }
 
     return size;
@@ -711,12 +709,12 @@ pub fn printTextureToScreen(plug_state: *PlugState, texture: *rl.RenderTexture, 
     defer rl.endDrawing();
 
     if (plug_state.background_texture) |bg| {
-        rl.drawTextureRec(bg, rl.Rectangle.init(0, 0, 1920, 1080), rl.Vector2.init(0, 0), rl.Color.white);
+        rl.drawTextureRec(bg, rl.Rectangle.init(0, 0, 1280, 720), rl.Vector2.init(0, 0), rl.Color.white);
     } else {
         rl.clearBackground(rl.Color.blank);
     }
 
-    rl.drawTextureRec(texture.texture, rl.Rectangle.init(0, 0, 1920, -1080), rl.Vector2.init(0, 0), rl.Color.white);
+    rl.drawTextureRec(texture.texture, rl.Rectangle.init(0, 0, 1280, -720), rl.Vector2.init(0, 0), rl.Color.white);
 
     if (infoRender) |extraRender| {
         extraRender(plug_state);
@@ -731,7 +729,7 @@ pub fn applyShadersToTexture(plug_state: *PlugState, input_texture: *rl.RenderTe
 
         rl.clearBackground(rl.Color.blank);
 
-        rl.drawTextureRec(input_texture.texture, rl.Rectangle.init(0, 0, 1920, -1080), rl.Vector2.init(0, 0), rl.Color.white);
+        rl.drawTextureRec(input_texture.texture, rl.Rectangle.init(0, 0, 1280, -720), rl.Vector2.init(0, 0), rl.Color.white);
         return;
     }
 
@@ -741,7 +739,7 @@ pub fn applyShadersToTexture(plug_state: *PlugState, input_texture: *rl.RenderTe
 
         rl.clearBackground(rl.Color.blank);
 
-        rl.drawTextureRec(input_texture.texture, rl.Rectangle.init(0, 0, 1920, -1080), rl.Vector2.init(0, 0), rl.Color.white);
+        rl.drawTextureRec(input_texture.texture, rl.Rectangle.init(0, 0, 1280, -720), rl.Vector2.init(0, 0), rl.Color.white);
     }
 
     var ping = &plug_state.ping_texture;
@@ -761,7 +759,7 @@ pub fn applyShadersToTexture(plug_state: *PlugState, input_texture: *rl.RenderTe
 
         rl.clearBackground(rl.Color.blank);
 
-        rl.drawTextureRec(ping.texture, rl.Rectangle.init(0, 0, 1920, -1080), rl.Vector2.init(0, 0), rl.Color.white);
+        rl.drawTextureRec(ping.texture, rl.Rectangle.init(0, 0, 1280, -720), rl.Vector2.init(0, 0), rl.Color.white);
     }
 }
 
@@ -774,14 +772,14 @@ fn applyShaderToTexture(shader: *PlugState.ShaderInfo, input_texture: *const rl.
     rl.beginShaderMode(shader.shader);
     defer rl.endShaderMode();
 
-    rl.drawTextureRec(input_texture.texture, rl.Rectangle.init(0, 0, 1920, -1080), rl.Vector2.init(0, 0), rl.Color.white);
+    rl.drawTextureRec(input_texture.texture, rl.Rectangle.init(0, 0, 1280, -720), rl.Vector2.init(0, 0), rl.Color.white);
 }
 
 pub fn printToImage(input_texture: rl.RenderTexture, output_texture: rl.RenderTexture) rl.Image {
     rl.beginTextureMode(output_texture);
     defer rl.endTextureMode();
 
-    rl.drawTextureRec(input_texture.texture, rl.Rectangle.init(0, 0, 1920, -1080), rl.Vector2.init(0, 0), rl.Color.white);
+    rl.drawTextureRec(input_texture.texture, rl.Rectangle.init(0, 0, 1280, -720), rl.Vector2.init(0, 0), rl.Color.white);
 
     return rl.loadImageFromTexture(output_texture.texture);
 }

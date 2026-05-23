@@ -378,7 +378,7 @@ var fpsBuffer: [100]u8 = [1]u8{0} ** 100;
 
 fn RenderVisualizeVideoWithFFMPEG(plug_state: *PlugState) void {
     const fpsToText = std.fmt.bufPrint(&fpsBuffer, "{}", .{plug_state.settings.fps}) catch @panic("Should never happen.");
-    const argv = [_][]const u8{ "ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", "1920x1080", "-r", fpsToText, "-i", "-", "-i", plug_state.song.?.path, "-vf", "vflip", "-c:v", "libx264", "-b:v", "25000k", "-c:a", "aac", "-b:a", "200k", "output.mp4" };
+    const argv = [_][]const u8{ "ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", "1280x720", "-r", fpsToText, "-i", "-", "-i", plug_state.song.?.path, "-vf", "vflip", "-c:v", "libx264", "-b:v", "25000k", "-c:a", "aac", "-b:a", "200k", "output.mp4" };
     var proc = std.process.Child.init(&argv, plug_state.allocator);
     proc.stdin_behavior = .Pipe;
     proc.spawn() catch @panic("Failed ffmpeg launch");
@@ -431,7 +431,7 @@ fn RenderVisualizeVideoWithFFMPEG(plug_state: *PlugState) void {
 
         const pixels_raw: [*]const u8 = @ptrCast(@alignCast(image.data));
 
-        const pixels: []const u8 = pixels_raw[0 .. 1920 * 1080 * 4];
+        const pixels: []const u8 = pixels_raw[0 .. 1280 * 720 * 4];
 
         _ = proc.stdin.?.write(pixels) catch @panic("Bad Pipe!");
 
@@ -503,8 +503,8 @@ fn RenderVisualizerData(plug_state: *PlugState) void {
 fn RenderVisualizerUI(plug_state: *PlugState) void {
     const width: f32 = 1400;
     const height: f32 = 800;
-    const start_x = (1920 - width) / 2;
-    const start_y = (1080 - height) / 2;
+    const start_x = (1280 - width) / 2;
+    const start_y = (720 - height) / 2;
 
     const size = rl.Rectangle.init(start_x, start_y, width, height);
     RenderSettingDialog(plug_state, size);
